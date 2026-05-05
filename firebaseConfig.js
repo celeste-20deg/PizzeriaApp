@@ -1,5 +1,8 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore"; // Importamos la base de datos
+import { getFirestore } from "firebase/firestore";
+// 1. Importamos las herramientas de Auth y el almacenamiento
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getReactNativePersistence, initializeAuth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDU7FIdAU8YiaqWyWr_wt5daXkwy2KnHNo",
@@ -12,6 +15,11 @@ const firebaseConfig = {
 
 // Inicializamos Firebase
 const app = initializeApp(firebaseConfig);
+
+// 2. Inicializamos Auth con persistencia de datos (esto quita el error)
+export const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage)
+});
 
 // Exportamos 'db' para que el formulario de pedidos pueda usarlo
 export const db = getFirestore(app);
