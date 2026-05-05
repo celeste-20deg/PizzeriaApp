@@ -1,11 +1,13 @@
 import { Stack } from 'expo-router';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import SplashScreen from './SplashScreen';
 
 export default function RootLayout() {
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [isReady, setIsReady] = useState(false); 
 
   useEffect(() => {
     const auth = getAuth();
@@ -16,6 +18,16 @@ export default function RootLayout() {
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    setTimeout(() => {
+      setIsReady(true);
+    }, 2000);
+  }, []);
+
+  if (!isReady) {
+    return <SplashScreen />;
+  }
+
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -24,17 +36,18 @@ export default function RootLayout() {
     );
   }
 
-  return (
+ return (
     <Stack screenOptions={{ headerShown: false }}>
-      {/* Si no hay usuario, solo mostramos login y registro */}
-      {!user ? (
-        <>
-          <Stack.Screen name="login" />
-          <Stack.Screen name="registro" />
-        </>
-      ) : (
-        /* Si hay usuario, habilitamos las pestañas */
+      {user ? (
+        // Si hay usuario, solo mostramos las tabs
         <Stack.Screen name="(tabs)" />
+      ) : (
+        // Si NO hay usuario, mostramos login y registro
+        // Al ponerlos por separado y sin <>, expo los acepta perfecto
+        [
+          <Stack.Screen key="login" name="login" />,
+          <Stack.Screen key="registro" name="registro" />
+        ]
       )}
     </Stack>
   );
