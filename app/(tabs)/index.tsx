@@ -1,11 +1,21 @@
-//app/(tabs)/index.tsx
-// app/(tabs)/index.tsx
 import { Ionicons } from '@expo/vector-icons';
-import { getAuth } from 'firebase/auth';
+import { router } from 'expo-router';
+import { getAuth, signOut } from 'firebase/auth';
 import { addDoc, collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { db } from '../../firebaseConfig';
+
+const COLORS = {
+  background: "#F5EBDC",
+  card: "#FFFFFF",
+  input: "#F1E7D6",
+  primary: "#E67E22",
+  textMain: "#5A4634",
+  textSoft: "#7A6E65",
+  border: "#E0D6C8"
+};
 
 interface Producto {
   id: string;
@@ -23,7 +33,6 @@ export default function PedidosScreen() {
   const [cantidadInput, setCantidadInput] = useState('1');
   const auth = getAuth();
 
-  // --- LÓGICA DE ESCUCHA EN TIEMPO REAL (PARA CONFIRMACIÓN) ---
   useEffect(() => {
     const usuarioActual = auth.currentUser;
     if (!usuarioActual) return;
@@ -38,7 +47,6 @@ export default function PedidosScreen() {
       snapshot.docChanges().forEach((change) => {
         if (change.type === "added" || change.type === "modified") {
           const pedidoData = change.doc.data();
-          // Pasamos el ID, los items y el total para el desglose del Alert
           mostrarAlertaConfirmacion(change.doc.id, pedidoData.items, pedidoData.total);
         }
       });
@@ -48,7 +56,6 @@ export default function PedidosScreen() {
   }, []);
 
   const mostrarAlertaConfirmacion = (pedidoId: string, items: any[], total: number) => {
-    // Generamos el detalle línea por línea: Cantidad x Nombre - Subtotal
     const detallePedido = items.map(item => 
       `• ${item.cantidad}x ${item.nombre} - ${(item.cantidad * item.precio).toFixed(2)} Bs`
     ).join('\n');
@@ -58,19 +65,10 @@ export default function PedidosScreen() {
       `Total: ${total.toFixed(2)} Bs\n\n` +
       `¿Confirmas que recibiste tu pedido correctamente?`;
 
-    Alert.alert(
-      "¡Tu pedido ha llegado! 🍕",
-      mensajeCompleto,
-      [
-        { text: "Aún no", style: "cancel" },
-        { 
-          text: "Sí, Recibido", 
-          onPress: () => finalizarPedidoCliente(pedidoId),
-          style: "default"
-        }
-      ],
-      { cancelable: false }
-    );
+    Alert.alert("¡Tu pedido ha llegado! 🍕", mensajeCompleto, [
+      { text: "Aún no", style: "cancel" },
+      { text: "Sí, Recibido", onPress: () => finalizarPedidoCliente(pedidoId) }
+    ]);
   };
 
   const finalizarPedidoCliente = async (pedidoId: string) => {
@@ -81,20 +79,19 @@ export default function PedidosScreen() {
         fechaConfirmacion: new Date().toLocaleString(),
         confirmadoCliente: true
       });
-      Alert.alert("¡Disfruta!", "El pedido se ha marcado como entregado satisfactoriamente.");
-    } catch (error) {
-      Alert.alert("Error", "No se pudo confirmar la recepción.");
+      Alert.alert("¡Disfruta!", "Pedido confirmado.");
+    } catch {
+      Alert.alert("Error", "No se pudo confirmar.");
     }
   };
-  // ---------------------------------------------------------
 
   const menu: Producto[] = [
-    { id: '1', nombre: 'Café', precio: 10, icon: 'cafe-outline' },
-    { id: '2', nombre: 'Pizza', precio: 50, icon: 'pizza-outline' },
-    { id: '3', nombre: 'Pollo', precio: 35, icon: 'restaurant-outline' },
-    { id: '4', nombre: 'Helado', precio: 15, icon: 'ice-cream-outline' },
-    { id: '5', nombre: 'Sandwich', precio: 25, icon: 'fast-food-outline' },
-    { id: '6', nombre: 'Picante', precio: 30, icon: 'flame-outline' },
+    { id: '1', nombre: 'Café', precio: 10, icon: 'cafe' },
+    { id: '2', nombre: 'Pizza', precio: 50, icon: 'pizza' },
+    { id: '3', nombre: 'Pollo', precio: 35, icon: 'restaurant' },
+    { id: '4', nombre: 'Helado', precio: 15, icon: 'ice-cream' },
+    { id: '5', nombre: 'Sandwich', precio: 25, icon: 'fast-food' },
+    { id: '6', nombre: 'Picante', precio: 30, icon: 'flame' },
   ];
 
   const agregarAlCarrito = (producto: Producto) => {
@@ -136,88 +133,245 @@ export default function PedidosScreen() {
         confirmadoCliente: false,
         fecha: new Date().toLocaleString()
       });
-      Alert.alert("¡Éxito!", "Pedido enviado. Espera a que el admin te lo entregue.");
+      Alert.alert("¡Éxito!", "Pedido enviado.");
       setCarrito([]);
-    } catch (error) {
-      Alert.alert("Error", "No se pudo enviar el pedido.");
+    } catch {
+      Alert.alert("Error", "No se pudo enviar.");
+    }
+  };
+
+  // 🔥 BOTÓN SALIR
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.replace('/login');
+    } catch {
+      Alert.alert("Error", "No se pudo cerrar sesión");
     }
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.headerCard}>
-        <Text style={styles.label}>Cantidad para el siguiente plato:</Text>
-        <TextInput
-          style={styles.input}
-          keyboardType="numeric"
-          value={cantidadInput}
-          onChangeText={setCantidadInput}
-        />
-      </View>
+    <SafeAreaView style={styles.safe}>
+      {/* HEADER */}
+      <View style={styles.header}>
 
-      <Text style={styles.sectionTitle}>MENÚ</Text>
-      <View style={styles.menuGrid}>
-        {menu.map(item => (
-          <TouchableOpacity 
-            key={item.id} 
-            style={styles.menuItem} 
-            onPress={() => agregarAlCarrito(item)}
-          >
-            <Ionicons name={item.icon as any} size={30} color="#5D4037" />
-            <Text style={styles.menuName}>{item.nombre}</Text>
-            <Text style={styles.menuPrice}>{item.precio} Bs</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={styles.resumenContainer}>
-        <Text style={styles.sectionTitle}>RESUMEN DE TU PEDIDO</Text>
-        <View style={styles.tableHeader}>
-          <Text style={[styles.headerText, { flex: 1 }]}>Cant.</Text>
-          <Text style={[styles.headerText, { flex: 2 }]}>Descripción</Text>
-          <Text style={[styles.headerText, { flex: 1 }]}>Importe</Text>
-          <Text style={[styles.headerText, { flex: 0.5 }]}></Text>
-        </View>
-
-        {carrito.map(item => (
-          <View key={item.id} style={styles.tableRow}>
-            <Text style={{ flex: 1 }}>{item.cantidad}</Text>
-            <Text style={{ flex: 2 }}>{item.nombre}</Text>
-            <Text style={{ flex: 1 }}>{(item.cantidad * item.precio).toFixed(2)}</Text>
-            <TouchableOpacity onPress={() => eliminarDelCarrito(item.id)} style={{ flex: 0.5 }}>
-              <Ionicons name="trash-outline" size={18} color="red" />
-            </TouchableOpacity>
-          </View>
-        ))}
-
-        <View style={styles.totalRow}>
-          <Text style={styles.totalText}>Total: {calcularTotal().toFixed(2)} Bs</Text>
-        </View>
-
-        <TouchableOpacity style={styles.button} onPress={handleEnviarPedido}>
-          <Text style={styles.buttonText}>ENVIAR PEDIDO</Text>
+        {/* BOTÓN SALIR */}
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={20} color="#fff" />
         </TouchableOpacity>
+
+        <View style={styles.logoCircle}>
+          <Ionicons name="pizza" size={30} color={COLORS.primary} />
+        </View>
+        <Text style={styles.logoText}>KAICLO</Text>
+        <Text style={styles.logoSub}>FOOD</Text>
       </View>
-    </ScrollView>
+
+      <ScrollView contentContainerStyle={{ padding: 15 }}>
+        <View style={styles.headerCard}>
+          <Text style={styles.label}>Cantidad para el siguiente plato:</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={cantidadInput}
+            onChangeText={setCantidadInput}
+          />
+        </View>
+
+        <Text style={styles.sectionTitle}>MENÚ</Text>
+
+        <View style={styles.menuGrid}>
+          {menu.map(item => (
+            <TouchableOpacity 
+              key={item.id} 
+              style={styles.menuItem} 
+              onPress={() => agregarAlCarrito(item)}
+            >
+              <Ionicons name={item.icon as any} size={32} color={COLORS.primary} />
+              <Text style={styles.menuName}>{item.nombre}</Text>
+
+              <View style={styles.priceCircle}>
+                <Text style={styles.priceText}>{item.precio} Bs</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={styles.resumenContainer}>
+          <Text style={styles.sectionTitle}>TU PEDIDO:</Text>
+
+          {carrito.map(item => (
+            <View key={item.id} style={styles.tableRow}>
+              <Text style={{ flex: 1 }}>{item.cantidad}</Text>
+              <Text style={{ flex: 2 }}>{item.nombre}</Text>
+              <Text style={{ flex: 1 }}>{(item.cantidad * item.precio).toFixed(2)}</Text>
+
+              <TouchableOpacity onPress={() => eliminarDelCarrito(item.id)}>
+                <Ionicons name="trash" size={18} color={COLORS.primary} />
+              </TouchableOpacity>
+            </View>
+          ))}
+
+          <View style={styles.totalRow}>
+            <Text style={styles.totalText}>
+              Total: {calcularTotal().toFixed(2)} Bs
+            </Text>
+          </View>
+
+          <TouchableOpacity style={styles.button} onPress={handleEnviarPedido}>
+            <Text style={styles.buttonText}>CONFIRMAR PEDIDO</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fdfcf0', padding: 15 },
-  headerCard: { backgroundColor: '#fff', padding: 15, borderRadius: 10, marginBottom: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginVertical: 10, color: '#3E2723' },
-  input: { borderBottomWidth: 1, borderColor: '#ccc', padding: 5, textAlign: 'center', fontSize: 18 },
-  label: { fontSize: 14, color: '#666', marginBottom: 5 },
-  menuGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  menuItem: { backgroundColor: '#fff', width: '48%', padding: 15, borderRadius: 12, alignItems: 'center', marginBottom: 15, elevation: 2 },
-  menuName: { fontWeight: 'bold', marginTop: 5 },
-  menuPrice: { color: '#795548' },
-  resumenContainer: { backgroundColor: '#fff', borderRadius: 15, padding: 15, marginTop: 10, marginBottom: 40 },
-  tableHeader: { flexDirection: 'row', borderBottomWidth: 1, borderColor: '#eee', paddingBottom: 5 },
-  headerText: { fontWeight: 'bold', color: '#888' },
-  tableRow: { flexDirection: 'row', paddingVertical: 10, borderBottomWidth: 0.5, borderColor: '#eee', alignItems: 'center' },
-  totalRow: { marginTop: 15, alignItems: 'flex-end' },
-  totalText: { fontSize: 18, fontWeight: 'bold', color: '#2E7D32' },
-  button: { backgroundColor: '#f44336', padding: 15, borderRadius: 10, alignItems: 'center', marginTop: 20 },
-  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
+  safe: { flex: 1, backgroundColor: COLORS.background },
+
+  header: {
+    alignItems: "center",
+    paddingVertical: 10
+  },
+
+  logoutBtn: {
+    position: "absolute",
+    top: 10,
+    right: 15,
+    backgroundColor: COLORS.primary,
+    padding: 8,
+    borderRadius: 20,
+    elevation: 4
+  },
+
+  logoCircle: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 4
+  },
+
+  logoText: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: COLORS.textMain,
+    letterSpacing: 2,
+    marginTop: 5
+  },
+
+  logoSub: {
+    fontSize: 12,
+    color: COLORS.textSoft,
+    letterSpacing: 2
+  },
+
+  headerCard: {
+    backgroundColor: COLORS.card,
+    padding: 15,
+    borderRadius: 18,
+    marginBottom: 20,
+    elevation: 3
+  },
+
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginVertical: 10,
+    color: COLORS.textMain
+  },
+
+  label: {
+    fontSize: 14,
+    color: COLORS.textSoft,
+    marginBottom: 5
+  },
+
+  input: {
+    backgroundColor: COLORS.input,
+    borderRadius: 12,
+    padding: 10,
+    textAlign: 'center',
+    fontSize: 18
+  },
+
+  menuGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between'
+  },
+
+  menuItem: {
+    backgroundColor: COLORS.card,
+    width: '48%',
+    padding: 15,
+    borderRadius: 18,
+    alignItems: 'center',
+    marginBottom: 15,
+    elevation: 3
+  },
+
+  menuName: {
+    fontWeight: '600',
+    marginTop: 5,
+    color: COLORS.textMain
+  },
+
+  priceCircle: {
+    marginTop: 8,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 50
+  },
+
+  priceText: {
+    color: '#fff',
+    fontWeight: 'bold'
+  },
+
+  resumenContainer: {
+    backgroundColor: COLORS.card,
+    borderRadius: 18,
+    padding: 15,
+    marginTop: 10,
+    marginBottom: 40
+  },
+
+  tableRow: {
+    flexDirection: 'row',
+    paddingVertical: 10,
+    borderBottomWidth: 0.5,
+    borderColor: COLORS.border,
+    alignItems: 'center'
+  },
+
+  totalRow: {
+    marginTop: 15,
+    alignItems: 'flex-end'
+  },
+
+  totalText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.primary
+  },
+
+  button: {
+    backgroundColor: COLORS.primary,
+    padding: 15,
+    borderRadius: 15,
+    alignItems: 'center',
+    marginTop: 20
+  },
+
+  buttonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16
+  }
 });
